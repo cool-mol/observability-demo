@@ -37,3 +37,4 @@ build/
 
 # elasticsearch data
 elasticsearch/data/
+!elasticsearch/data/data
