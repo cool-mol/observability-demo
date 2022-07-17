@@ -36,5 +36,5 @@ build/
 .DS_Store
 
 # elasticsearch data
-elasticsearch/data/
+elasticsearch/data/*
 !elasticsearch/data/data
