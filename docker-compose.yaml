@@ -1,0 +1,110 @@
+version: '3.2'
+
+services:
+  database:
+    image: mysql:5.7
+    container_name: database-mysql
+    volumes:
+      - type: bind
+        source: ./data/movies.csv
+        target: /var/lib/mysql-files/movies.csv
+        read_only: true
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+      - MYSQL_DATABASE=demo
+    networks:
+      - demo
+
+  backend:
+    image: 2022sjtuse-2320/demo:v1
+    container_name: backend-springboot
+    depends_on:
+      - database
+    ports:
+      - "8080:8080"
+    environment:
+      - JVM_OPTS="-Xms128m -Xmx128m -XX:PermSize=128m -XX:MaxPermSize=128m"
+    networks:
+      - demo
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    volumes:
+      - type: bind
+        source: ./prometheus.yml
+        target: /etc/prometheus/prometheus.yml
+        read_only: true
+    ports:
+      - "9090:9090"
+    networks:
+      - demo
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - demo
+
+  elasticsearch:
+    image: elasticsearch:7.5.0
+    container_name: elasticsearch
+    environment:
+      - "cluster.name=elasticsearch" #设置集群名称为elasticsearch
+      - "discovery.type=single-node" #以单一节点模式启动
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m" #设置使用jvm内存大小
+    volumes:
+      - ./elasticsearch/data:/usr/share/elasticsearch/data #数据文件挂载
+      # - ./elasticsearch/plugins:/usr/share/elasticsearch/plugins #插件文件挂载
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - demo
+
+  kibana:
+    image: kibana:7.5.0
+    container_name: kibana
+    links:
+      - elasticsearch:es #可以用es这个域名访问elasticsearch服务
+    depends_on:
+      - elasticsearch #kibana在elasticsearch启动之后再启动
+    environment:
+      - "elasticsearch.hosts=http://es:9200" #设置访问elasticsearch的地址
+    ports:
+      - 5601:5601
+    networks:
+      - demo
+
+  logstash:
+    image: logstash:7.5.0
+    container_name: logstash
+    volumes:
+      - ./logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf #挂载logstash的配置文件
+    depends_on:
+      - elasticsearch #kibana在elasticsearch启动之后再启动
+    links:
+      - elasticsearch:es #可以用es这个域名访问elasticsearch服务
+    ports:
+      - 4560:4560
+    networks:
+      - demo
+
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:7.9.2
+    container_name: apm-server
+    depends_on:
+      - elasticsearch #kibana在elasticsearch启动之后再启动
+    ports:
+      - 8200:8200
+    links:
+      - elasticsearch:es
+    networks:
+      - demo
+networks:
+  demo:
+    driver: bridge
